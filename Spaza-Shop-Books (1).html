@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spaza Shop Books</title>
+<style>
+/* Layout idea: a shop counter. Quiet ledger pages, one loud thing: the till slip on the Sell page. */
+:root{
+  --bg:#edf0f5; --surface:#ffffff; --ink:#14213d; --muted:#57637b; --line:#d3dae6;
+  --accent:#1a4fd6; --accent-ink:#ffffff; --sun:#f5b700; --slip:#fffdf3;
+  --good:#146c43; --warn:#8f5200; --bad:#b3261e;
+  --good-bg:#dff3e8; --warn-bg:#fdeccb; --bad-bg:#fbe0dd;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"DM Mono",ui-monospace,"Courier New",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1320; --surface:#172030; --ink:#e9eef7; --muted:#9ba8be; --line:#2b384d;
+    --accent:#7aa2ff; --accent-ink:#0b1220; --sun:#ffc933; --slip:#1e2839;
+    --good:#62d49c; --warn:#f2b860; --bad:#ff9087;
+    --good-bg:#143526; --warn-bg:#3b2c10; --bad-bg:#431c19;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1320; --surface:#172030; --ink:#e9eef7; --muted:#9ba8be; --line:#2b384d;
+  --accent:#7aa2ff; --accent-ink:#0b1220; --sun:#ffc933; --slip:#1e2839;
+  --good:#62d49c; --warn:#f2b860; --bad:#ff9087;
+  --good-bg:#143526; --warn-bg:#3b2c10; --bad-bg:#431c19;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:1.7rem;font-weight:800}
+h2{font-size:1.15rem;font-weight:600}
+h3{font-size:1rem;font-weight:600}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+[hidden]{display:none!important}
+
+/* shell */
+.app{display:flex;min-height:100vh}
+.side{display:none}
+.main{flex:1;min-width:0;padding:16px 16px 96px;max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--display);font-weight:800;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.brand i{width:12px;height:12px;background:var(--sun);border-radius:2px;display:inline-block;transform:rotate(45deg)}
+.status{font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.status.ok{color:var(--good)} .status.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--surface);border-top:1px solid var(--line);z-index:5}
+.tabs a{flex:1;text-align:center;padding:14px 2px 16px;font-size:.8rem;font-weight:700;color:var(--muted);text-decoration:none;border-top:3px solid transparent}
+.tabs a.on{color:var(--accent);border-top-color:var(--accent)}
+@media (min-width:900px){
+  .tabs{display:none}
+  .side{display:flex;flex-direction:column;gap:6px;width:210px;padding:24px 14px;background:var(--surface);border-right:1px solid var(--line);position:sticky;top:0;height:100vh}
+  .side .brand{margin:0 8px 18px}
+  .side a{padding:10px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:700}
+  .side a:hover{background:var(--bg)}
+  .side a.on{background:var(--accent);color:var(--accent-ink)}
+  .side .status{margin-top:auto;align-self:flex-start}
+  .main{padding:28px 32px 48px}
+  .top .brand,.top .status{display:none}
+}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+
+/* pieces */
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);padding:10px 14px;border-radius:8px;font-weight:700;cursor:pointer;min-height:44px}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:.875rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media (min-width:720px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile b{font-family:var(--display);font-size:1.35rem;font-weight:800;overflow-wrap:anywhere}
+.tile span{font-size:.8rem;color:var(--muted)}
+.tile.hi{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tile.hi span{color:inherit;opacity:.85}
+.cols{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.cols>*{min-width:0}
+@media (min-width:900px){.cols{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start}}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.pill.good{background:var(--good-bg);color:var(--good)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.plain{background:var(--bg);color:var(--muted)}
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .grow b{display:block;overflow-wrap:anywhere}
+.row .amt{font-weight:700;white-space:nowrap}
+.row.void .grow,.row.void .amt{text-decoration:line-through;color:var(--muted)}
+.empty{color:var(--muted);padding:8px 0}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:480px}
+th,td{text-align:right;padding:8px 10px;border-top:1px solid var(--line);white-space:nowrap}
+th{font-size:.8rem;color:var(--muted);font-weight:700;border-top:0}
+th:first-child,td:first-child{text-align:left}
+tfoot td{font-weight:700;border-top:2px solid var(--ink)}
+.neg{color:var(--bad)}
+
+/* week bars */
+.bars{display:flex;align-items:flex-end;gap:8px;height:110px}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
+.bars i{display:block;width:100%;background:var(--line);border-radius:4px 4px 0 0;min-height:3px}
+.bars .now i{background:var(--accent)}
+.bars span{font-size:.72rem;color:var(--muted)}
+.bars em{font-style:normal;font-size:.72rem;font-weight:700}
+
+/* sell */
+.search{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.prod{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:76px}
+.prod:hover{border-color:var(--accent)}
+.prod b{overflow-wrap:anywhere;line-height:1.2}
+.prod .p{font-family:var(--mono);font-size:.9rem}
+.prod .q{font-size:.75rem;color:var(--muted)}
+.prod .q.low{color:var(--bad);font-weight:700}
+.prod.other{border-style:dashed}
+.slip{background:var(--slip);border:1px solid var(--line);border-radius:4px 4px 0 0;padding:18px 16px 22px;font-family:var(--mono);font-size:.9rem;display:flex;flex-direction:column;gap:10px;position:relative}
+.slip::after{content:"";position:absolute;left:-1px;right:-1px;bottom:-9px;height:10px;background:linear-gradient(135deg,var(--slip) 5px,transparent 0) 0 0/10px 10px repeat-x,linear-gradient(-135deg,var(--slip) 5px,transparent 0) 0 0/10px 10px repeat-x}
+.slip h2{font-family:var(--mono);font-weight:500;text-align:center;letter-spacing:.12em;text-transform:uppercase;font-size:.9rem}
+.slip .dash{border-top:1px dashed var(--muted);opacity:.6}
+.sl{display:flex;align-items:center;gap:8px}
+.sl .n{flex:1;min-width:0;overflow-wrap:anywhere}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:32px;height:32px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700}
+.qty span{min-width:22px;text-align:center}
+.total{display:flex;justify-content:space-between;font-size:1.25rem;font-weight:500}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-family:var(--body)}
+.seg button{flex:1;border:0;background:var(--surface);padding:10px 4px;cursor:pointer;font-weight:700;font-size:.85rem;min-height:44px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.slip .field,.slip .btn{font-family:var(--body)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;min-height:38px;cursor:pointer;font-family:var(--mono);font-size:.85rem}
+.chips button:hover{border-color:var(--accent)}
+.chg{background:var(--sun);color:#14213d;padding:0 8px;border-radius:4px}
+.jump{position:fixed;left:12px;right:12px;bottom:66px;z-index:4;display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:10px;font-weight:700;border:0;cursor:pointer}
+@media (min-width:900px){.jump{display:none}.sellcols{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}.slipwrap{position:sticky;top:24px}}
+
+/* meter */
+.meter{height:12px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.meter i{display:block;height:100%;background:var(--good);border-radius:99px}
+.meter i.warn{background:var(--sun)} .meter i.bad{background:var(--bad)}
+
+/* forms + sheet */
+.sheet{position:fixed;inset:0;background:rgba(8,12,22,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:0}
+.sheet form{background:var(--surface);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:20px 16px 24px;display:flex;flex-direction:column;gap:14px}
+@media (min-width:600px){.sheet{align-items:center;padding:16px}.sheet form{border-radius:16px;padding:24px}}
+.field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.field label{font-size:.85rem;font-weight:700}
+.field input,.field select{padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px;width:100%}
+.two{display:flex;gap:10px}
+.check{display:flex;align-items:center;gap:10px;min-height:44px}
+.check input{width:22px;height:22px}
+.err{color:var(--bad);font-weight:700;font-size:.9rem}
+.sheetbtns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.line{display:grid;grid-template-columns:1fr 64px 90px 36px;gap:6px;align-items:end}
+.line input,.line select{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px;width:100%;min-width:0}
+.line button{height:44px;border:1px solid var(--line);background:var(--surface);border-radius:8px;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:30;font-weight:700;max-width:calc(100% - 32px);text-align:center}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:700}
+.steps{display:flex;flex-direction:column;gap:10px;counter-reset:s}
+.steps .row{border:0;padding:0}
+.steps .row::before{counter-increment:s;content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--sun);color:#14213d;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+@media (prefers-reduced-motion:no-preference){.sheet form{animation:up .18s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" id="side" aria-label="Sections"></nav>
+  <main class="main">
+    <div class="top"><div class="brand"><i></i><span id="shopname">Spaza Shop Books</span></div><span class="status" id="status1">Loading</span></div>
+    <div id="banner" hidden></div>
+    <div id="view"></div>
+  </main>
+</div>
+<nav class="tabs" id="tabs" aria-label="Sections"></nav>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const M = n => (n < 0 ? "-" : "") + "M " + Math.abs(r2(n)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const iso = d => { const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return x.toISOString().slice(0, 10); };
+const today = () => iso(new Date());
+const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const nice = s => { const [y, m, d] = s.split("-"); return Number(d) + " " + MONTHS[m - 1] + " " + y; };
+const VAT_LIMIT = 2000000;
+const EXP_CATS = ["Rent", "Electricity and water", "Transport", "Airtime and data", "Wages", "Licence and permits", "Bank charges", "Repairs", "Packaging", "Other"];
+const PAY = { cash: "Cash", mobile: "M-Pesa / EcoCash", credit: "Sekoloto" };
+
+/* ---------- state ---------- */
+const S = {
+  mode: "loading", slow: false, stale: false, readonly: false, pending: 0,
+  got: { days: false, products: false, customers: false, shop: false },
+  days: {}, products: {}, customers: {}, shop: {},
+  view: "today", cart: [], pay: "cash", cust: "", tender: "", storageBad: false, saleDate: today(), search: "", taxYear: null, recv: []
+};
+let db = null;
+
+/* ---------- offline store: records live in this browser on this device ---------- */
+async function localDb() {
+  const KEY = "spaza-practice"; let data = {}, idb = null, local = null, quiet = false; const subs = new Set();
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  try {
+    idb = await new Promise((res, rej) => { const r = indexedDB.open("spaza-books", 1); r.onupgradeneeded = () => r.result.createObjectStore("docs"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error("blocked")); });
+    const st = idb.transaction("docs").objectStore("docs");
+    const [keys, vals] = await Promise.all([req(st.getAllKeys()), req(st.getAll())]);
+    keys.forEach((k, i) => data[k] = vals[i]);
+  } catch (e) { idb = null; }
+  const persist = async paths => {
+    if (!quiet && local && local.onWrite) local.onWrite(paths);
+    if (idb) await new Promise((res, rej) => {
+      const tx = idb.transaction("docs", "readwrite"), st = tx.objectStore("docs");
+      paths.forEach(p => data[p] === undefined ? st.delete(p) : st.put(data[p], p));
+      tx.oncomplete = res; tx.onerror = tx.onabort = () => rej({ code: "quota_exceeded", message: "storage" });
+    });
+    else { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { S.storageBad = true; throw { code: "quota_exceeded", message: "storage" }; } }
+    subs.forEach(f => f());
+  };
+  if (!Object.keys(data).length) { try { const old = JSON.parse(localStorage.getItem(KEY) || "{}"); if (old && Object.keys(old).length) { data = old; if (idb) await persist(Object.keys(data)); } } catch (e) {} }
+  if (!idb) { try { localStorage.setItem("spaza-test", "1"); localStorage.removeItem("spaza-test"); } catch (e) { S.storageBad = true; } }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+  const merge = (a, b) => { for (const k in b) { if (b[k] && typeof b[k] === "object" && !Array.isArray(b[k]) && a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) merge(a[k], b[k]); else a[k] = clone(b[k]); } };
+  const snap = p => ({ id: p.split("/").pop(), exists: !!data[p], data: () => data[p] ? clone(data[p]) : undefined, metadata: { fromCache: false, hasPendingWrites: false } });
+  const doc = p => ({
+    id: p.split("/").pop(), path: p,
+    get: async () => snap(p),
+    set: async d => { data[p] = clone(d); await persist([p]); },
+    update: async d => { if (!data[p]) throw { code: "invalid_argument", message: "missing" }; merge(data[p], d); await persist([p]); },
+    delete: async () => { delete data[p]; await persist([p]); },
+    onSnapshot: next => { const f = () => next(snap(p)); subs.add(f); setTimeout(f, 0); return () => subs.delete(f); }
+  });
+  const collection = p => {
+    const depth = p.split("/").length + 1;
+    const q = {
+      path: p, where: () => q, orderBy: () => q, limit: () => q,
+      doc: id => doc(p + "/" + (id || uid())),
+      onSnapshot: next => { const f = () => { const docs = Object.keys(data).filter(k => k.startsWith(p + "/") && k.split("/").length === depth).map(snap); next({ docs, size: docs.length, empty: !docs.length, metadata: { fromCache: false, hasPendingWrites: false } }); }; subs.add(f); setTimeout(f, 0); return () => subs.delete(f); }
+    };
+    return q;
+  };
+  const replaceAll = async docs => { const gone = Object.keys(data); data = clone(docs); await persist([...new Set(gone.concat(Object.keys(data)))]); };
+  local = { doc, collection, replaceAll, onWrite: null, peek: p => data[p], paths: () => Object.keys(data),
+    applyDocs: async docs => { const ps = Object.keys(docs); if (!ps.length) return; ps.forEach(p => data[p] = clone(docs[p])); quiet = true; try { await persist(ps); } finally { quiet = false; } } };
+  return local;
+}
+
+/* ---------- sync: work offline, swap records with the online copy whenever there is internet ---------- */
+const KINDS = ["sales", "exp", "buy", "pay", "adj"];
+const SY = (() => { try { return Object.assign({ url: "", key: "", code: "", rev: 0, dirty: {}, last: 0, err: "" }, JSON.parse(localStorage.getItem("spaza-sync") || "{}")); } catch (e) { return { url: "", key: "", code: "", rev: 0, dirty: {}, last: 0, err: "" }; } })();
+const sySave = () => { try { localStorage.setItem("spaza-sync", JSON.stringify(SY)); } catch (e) {} };
+const canon = v => v === null || typeof v !== "object" ? JSON.stringify(v === undefined ? null : v) : Array.isArray(v) ? "[" + v.map(canon).join(",") + "]" : "{" + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+function mergeDoc(path, a, b) {            // a = this device, b = online copy
+  if (!a) return b; if (!b) return a;
+  if (!path.startsWith("days/")) return (Number(a.u) || 0) >= (Number(b.u) || 0) ? a : b;   // newest edit wins
+  const out = { date: a.date || b.date };
+  KINDS.forEach(k => { const x = a[k] || {}, y = b[k] || {}, m = {};
+    new Set(Object.keys(x).concat(Object.keys(y))).forEach(id => { m[id] = Object.assign({}, y[id], x[id]); if ((x[id] && x[id].void) || (y[id] && y[id].void)) m[id].void = true; });
+    out[k] = m; });
+  return out;                               // every entry from both sides is kept
+}
+async function rpc(fn, body) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const r = await fetch(SY.url + "/rest/v1/rpc/" + fn, { method: "POST", headers: { apikey: SY.key, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+    if (!r.ok) { const e = new Error("http " + r.status); e.status = r.status; throw e; }
+    return await r.json();
+  } finally { clearTimeout(to); }
+}
+let syncing = false, syncT = null;
+const syncOn = () => S.mode === "offline" && !!(SY.url && SY.key && SY.code);
+const pendingCount = () => Object.keys(SY.dirty).length;
+function kick(ms) { if (!syncOn()) return; clearTimeout(syncT); syncT = setTimeout(() => syncNow(), ms); }
+async function syncNow(loud) {
+  if (!syncOn() || syncing) return false;
+  syncing = true; paintStatus();
+  let ok = false;
+  try {
+    for (let more = true; more;) {
+      const rows = await rpc("spaza_pull", { code: SY.code, since: SY.rev || 0 });
+      const apply = {}; let top = SY.rev || 0;
+      for (const r of rows) {
+        top = Math.max(top, Number(r.rev) || 0);
+        const mine = db.peek(r.path), merged = mergeDoc(r.path, mine, r.data);
+        if (canon(merged) !== canon(mine)) apply[r.path] = merged;
+        if (canon(merged) !== canon(r.data)) SY.dirty[r.path] = 1; else delete SY.dirty[r.path];
+      }
+      await db.applyDocs(apply);
+      SY.rev = top; sySave(); more = rows.length >= 2000;
+    }
+    Object.keys(SY.dirty).forEach(p => { if (!db.peek(p)) delete SY.dirty[p]; });
+    const todo = Object.keys(SY.dirty);
+    for (let i = 0; i < todo.length; i += 40) {
+      const part = todo.slice(i, i + 40), docs = {}, sent = {};
+      part.forEach(p => { docs[p] = db.peek(p); sent[p] = canon(docs[p]); });
+      await rpc("spaza_push", { code: SY.code, docs });
+      part.forEach(p => { if (canon(db.peek(p)) === sent[p]) delete SY.dirty[p]; });
+      sySave();
+    }
+    SY.last = Date.now(); SY.err = ""; ok = true;
+  } catch (e) {
+    SY.err = e && e.status ? (e.status === 404 ? "The database setup script has not been run yet." : e.status === 401 || e.status === 403 ? "The project URL or key is wrong." : "The online copy refused the request (" + e.status + ").") : "offline";
+  }
+  syncing = false; sySave(); paintStatus();
+  if ($("#sheet").hidden && S.view === "tax") render();
+  if (loud) toast(ok ? "Everything is synced" : SY.err === "offline" ? "No internet right now. It will sync by itself later." : SY.err);
+  if (ok && pendingCount()) kick(1500);
+  return ok;
+}
+function syncStart() {
+  db.onWrite = paths => { paths.forEach(p => SY.dirty[p] = 1); sySave(); paintStatus(); kick(2500); };
+  window.addEventListener("online", () => kick(500));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) kick(500); });
+  setInterval(() => syncNow(), 60000);
+  kick(300);
+}
+const setupCode = () => "SPZ1." + btoa(unescape(encodeURIComponent(JSON.stringify({ u: SY.url, k: SY.key, c: SY.code }))));
+const SQL = `-- Spaza Shop Books: run this once in the Supabase SQL Editor
+create table if not exists spaza_docs (
+  shop text not null,
+  path text not null,
+  data jsonb not null,
+  rev  bigint not null,
+  primary key (shop, path)
+);
+create sequence if not exists spaza_rev;
+alter table spaza_docs enable row level security;  -- nobody reads the table directly
+
+create or replace function spaza_pull(code text, since bigint)
+returns table (path text, data jsonb, rev bigint)
+language sql security definer set search_path = public as $$
+  select d.path, d.data, d.rev from spaza_docs d
+  where d.shop = code and length(code) >= 20 and d.rev > since
+  order by d.rev limit 2000;
+$$;
+
+create or replace function spaza_push(code text, docs jsonb)
+returns bigint
+language plpgsql security definer set search_path = public as $$
+declare k text; v jsonb; n bigint := 0;
+begin
+  if code is null or length(code) < 20 then raise exception 'bad shop code'; end if;
+  for k, v in select * from jsonb_each(docs) loop
+    insert into spaza_docs (shop, path, data, rev) values (code, k, v, nextval('spaza_rev'))
+    on conflict (shop, path) do update set data = excluded.data, rev = excluded.rev;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+revoke all on function spaza_pull(text, bigint) from public;
+revoke all on function spaza_push(text, jsonb) from public;
+grant execute on function spaza_pull(text, bigint) to anon, authenticated;
+grant execute on function spaza_push(text, jsonb) to anon, authenticated;`;
+function syncSheet() {
+  sheet("Set up sync",
+    `<div class="steps">
+       <div class="row"><div class="grow"><b>First device only: prepare the online copy</b><span class="muted small">In your Supabase project open SQL Editor, paste the script and press Run.</span></div><button type="button" class="btn sm" data-act="copysql">Copy script</button></div>
+       <div class="row"><div class="grow"><b>Connect this device</b><span class="muted small">Second device? Just paste the setup code from the first one.</span></div></div></div>` +
+    fld("ycode", "Setup code from your other device", 'type="text" autocomplete="off" placeholder="SPZ1…  (leave empty on the first device)"') +
+    fld("yurl", "Project URL", 'type="url" autocomplete="off" placeholder="https://xxxx.supabase.co"', SY.url) +
+    fld("ykey", "Publishable key (or anon key)", 'type="text" autocomplete="off"', SY.key),
+    "Connect", async () => {
+      let u = val("yurl").replace(/\/+$/, ""), k = val("ykey"), c = SY.code;
+      const pasted = val("ycode");
+      if (pasted) { try { const o = JSON.parse(decodeURIComponent(escape(atob(pasted.replace(/^SPZ1\./, "").trim())))); u = o.u; k = o.k; c = o.c; } catch (e) { return formErr("That setup code is not complete. Copy it again from the other device."); } }
+      if (!/^https?:\/\/.+/.test(u || "") || !k) return formErr("Fill in the project URL and the key, or paste a setup code.");
+      if (/^sb_secret_/.test(k)) return formErr("That is the secret key. Use the publishable key instead.");
+      if (!c || c.length < 20) { const a = new Uint8Array(18); crypto.getRandomValues(a); c = Array.from(a, x => x.toString(36).padStart(2, "0")).join(""); }
+      const keep = { url: SY.url, key: SY.key, code: SY.code, rev: SY.rev };
+      Object.assign(SY, { url: u, key: k, code: c, rev: 0 }); db.paths().forEach(p => SY.dirty[p] = 1);
+      if (!(await syncNow())) { const why = SY.err === "offline" ? "Could not reach the online copy. Check the internet and the project URL." : SY.err; Object.assign(SY, keep); SY.err = ""; sySave(); return formErr(why); }
+      toast("Sync is on");
+    });
+}
+
+/* ---------- writes: one at a time per document ---------- */
+const chains = {};
+function write(path, fn) {
+  S.pending++; paintStatus();
+  const run = () => fn();
+  const p = (chains[path] || Promise.resolve()).then(run, run);
+  chains[path] = p.catch(() => {});
+  return p.finally(() => { S.pending--; paintStatus(); });
+}
+function dayPut(date, kind, id, obj) {
+  return write("days/" + date, async () => {
+    const ref = db.doc("days/" + date), patch = { [kind]: { [id]: obj } };
+    try { await ref.update(patch); }
+    catch (e) {
+      if (!e || e.code !== "invalid_argument") throw e;
+      const s = await ref.get();
+      if (s.exists) throw e;
+      await ref.set(Object.assign({ date, sales: {}, exp: {}, buy: {}, pay: {}, adj: {} }, patch));
+    }
+  });
+}
+const prodSet = (id, data) => write("products/" + id, () => db.doc("products/" + id).set(data));
+const prodUpd = (id, data) => write("products/" + id, () => db.doc("products/" + id).update(data));
+function fail(e) {
+  const c = e && e.code;
+  toast(c === "quota_exceeded" ? (S.mode === "offline" ? "Could not save. This device's storage is full or the browser is blocking it." : "Storage is full. Ask Claude to archive old records.") :
+    c === "invalid_argument" ? "This account can only view the records, not change them." :
+    "Could not save. Check your connection and try again.");
+}
+
+/* ---------- reading the records ---------- */
+function entries(kind, from, to, withVoid) {
+  const out = [];
+  for (const date in S.days) {
+    if ((from && date < from) || (to && date >= to)) continue;
+    const m = S.days[date][kind] || {};
+    for (const id in m) { const e = m[id]; if (e && (withVoid || !e.void)) out.push(Object.assign({ id, date, kind }, e)); }
+  }
+  return out;
+}
+const sum = (a, f) => r2(a.reduce((t, x) => t + (Number(f(x)) || 0), 0));
+const saleSum = (from, to) => sum(entries("sales", from, to), x => x.total);
+const expSum = (from, to) => sum(entries("exp", from, to), x => x.amt);
+const buySum = (from, to) => sum(entries("buy", from, to), x => x.amt);
+let stockCache = null;
+function stock() {
+  if (stockCache) return stockCache;
+  const m = {}, add = (p, q) => { if (p) m[p] = (m[p] || 0) + (Number(q) || 0); };
+  entries("sales").forEach(e => (e.items || []).forEach(i => add(i.p, -i.q)));
+  entries("buy").forEach(e => (e.items || []).forEach(i => add(i.p, i.q)));
+  entries("adj").forEach(e => add(e.p, e.d));
+  return stockCache = m;
+}
+const products = () => Object.entries(S.products).map(([id, p]) => Object.assign({}, p, { id, qty: stock()[id] || 0 })).filter(p => !p.archived).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+const isLow = p => Number(p.qty) <= Number(p.low || 0);
+const customers = () => Object.entries(S.customers).map(([id, c]) => Object.assign({ id }, c)).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+function balances() {
+  const b = {};
+  entries("sales").forEach(s => { if (s.pay === "credit" && s.cust) b[s.cust] = r2((b[s.cust] || 0) + s.total); });
+  entries("pay").forEach(p => { b[p.cust] = r2((b[p.cust] || 0) - p.amt); });
+  return b;
+}
+const startMonth = () => Number(S.shop.yearStart) || 4;
+function taxYearOf(date) { const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)); return m >= startMonth() ? y : y - 1; }
+function taxRange(y) { const m = String(startMonth()).padStart(2, "0"); return [y + "-" + m + "-01", (y + 1) + "-" + m + "-01"]; }
+const taxLabel = y => startMonth() === 1 ? String(y) : y + "/" + String(y + 1).slice(2);
+
+/* ---------- views ---------- */
+const NAV = [["today", "Today"], ["sell", "Sell"], ["stock", "Stock"], ["spend", "Spend"], ["credit", "Credit"], ["tax", "Tax"]];
+const views = {};
+
+views.today = () => {
+  const t = today(), prods = products(), low = prods.filter(isLow);
+  const sales = saleSum(t, addDays(t, 1)), out = r2(expSum(t, addDays(t, 1)) + buySum(t, addDays(t, 1)));
+  const owed = sum(Object.values(balances()), x => Math.max(0, x));
+  const fresh = !prods.length && !Object.keys(S.days).length;
+  const week = []; for (let i = 6; i >= 0; i--) { const d = addDays(t, -i); week.push([d, saleSum(d, addDays(d, 1))]); }
+  const max = Math.max(1, ...week.map(w => w[1]));
+  const feed = ["sales", "exp", "buy", "pay"].flatMap(k => entries(k, t, addDays(t, 1), true)).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const noSlip = entries("exp").concat(entries("buy")).filter(e => !e.receipt).length;
+  const needBackup = S.mode === "offline" && !syncOn() && !fresh && (!lastBackup() || lastBackup() < addDays(t, -7));
+  return `
+  <div class="head"><div><p class="muted small">${nice(t)}</p><h1>${esc(S.shop.name || "Your shop")} today</h1></div>
+    <div class="actions"><a class="btn primary" href="#sell">New sale</a><button class="btn" data-act="expense">Add expense</button></div></div>
+  ${fresh ? `<div class="card"><h2>Start here</h2><div class="steps">
+      <div class="row"><div class="grow"><b>Add your shop name and TIN</b><span class="muted small">They go on your tax summary.</span></div><button class="btn sm" data-act="shop">Add</button></div>
+      <div class="row"><div class="grow"><b>Add the things you sell</b><span class="muted small">Name, selling price, cost price and how many you have.</span></div><button class="btn sm" data-act="product">Add</button></div>
+      <div class="row"><div class="grow"><b>Record your first sale</b><span class="muted small">Tap items on the Sell page, or just type the amount.</span></div><a class="btn sm" href="#sell">Sell</a></div>
+    </div></div>` : ""}
+  <div class="tiles">
+    <div class="tile hi"><span>Sales today</span><b class="num">${M(sales)}</b></div>
+    <div class="tile"><span>Money out today</span><b class="num">${M(out)}</b></div>
+    <div class="tile"><span>Customers owe you</span><b class="num">${M(owed)}</b></div>
+    <div class="tile"><span>Items running low</span><b class="num">${low.length}</b></div>
+  </div>
+  <div class="cols">
+    <div class="card"><h2>Today's entries</h2><div class="list">${feed.length ? feed.map(feedRow).join("") : `<p class="empty">Nothing recorded yet today.</p>`}</div></div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card"><h2>Sales, last 7 days</h2><div class="bars">${week.map(([d, v], i) => `<div class="${i === 6 ? "now" : ""}"><em class="num">${v ? Math.round(v).toLocaleString("en-US") : ""}</em><i style="height:${Math.round(v / max * 70)}%"></i><span>${"SMTWTFS"[new Date(d + "T12:00:00").getDay()]}</span></div>`).join("")}</div></div>
+      <div class="card"><h2>Needs attention</h2><div class="list">
+        ${low.slice(0, 6).map(p => `<div class="row"><div class="grow"><b>${esc(p.name)}</b></div><span class="pill ${p.qty <= 0 ? "bad" : "warn"}">${p.qty <= 0 ? "Out of stock" : p.qty + " left"}</span></div>`).join("")}
+        ${low.length > 6 ? `<div class="row"><a href="#stock">See all ${low.length} low items</a></div>` : ""}
+        ${noSlip ? `<div class="row"><div class="grow"><b>${noSlip} ${noSlip === 1 ? "entry has" : "entries have"} no receipt</b><span class="muted small">Keep slips for everything you claim.</span></div><span class="pill warn">Receipts</span></div>` : ""}
+        ${needBackup ? `<div class="row"><div class="grow"><b>${lastBackup() ? "Last backup was " + nice(lastBackup()) : "No backup saved yet"}</b><span class="muted small">Records are only on this device. Save a copy.</span></div><button class="btn sm" data-act="backup">Back up</button></div>` : ""}
+        ${!low.length && !noSlip && !needBackup ? `<p class="empty">All good. Nothing needs you right now.</p>` : ""}
+      </div></div>
+    </div>
+  </div>`;
+};
+function feedRow(e) {
+  const what = e.kind === "sales" ? ["Sale", (e.items || []).map(i => i.q + " × " + i.n).join(", ") || "Sale", PAY[e.pay] + (e.cust && S.customers[e.cust] ? " · " + S.customers[e.cust].name : "") + (e.paid != null ? " · gave " + M(e.paid) + ", change " + M(e.change) : "")]
+    : e.kind === "exp" ? ["Expense", e.desc || e.cat, e.cat]
+    : e.kind === "buy" ? ["Stock bought", (e.supplier || "Supplier") + (e.inv ? " · inv " + e.inv : ""), (e.items || []).length + " item line(s)"]
+    : ["Paid on account", (S.customers[e.cust] || {}).name || "Customer", "Sekoloto payment"];
+  const plus = e.kind === "sales" || e.kind === "pay";
+  return `<div class="row ${e.void ? "void" : ""}"><div class="grow"><b>${esc(what[1])}</b><span class="muted small">${esc(what[0])} · ${esc(what[2])}${e.void ? " · cancelled" : ""}</span></div>
+    <span class="amt num ${plus ? "" : "neg"}">${plus ? "" : "-"}${M(e.kind === "sales" ? e.total : e.amt).replace("-", "")}</span>
+    ${e.void ? "" : `<button class="btn sm danger" data-act="void" data-kind="${e.kind}" data-date="${e.date}" data-id="${e.id}" aria-label="Cancel this entry">Cancel</button>`}</div>`;
+}
+
+views.sell = () => `
+  <div class="head"><div><h1>Sell</h1><p class="muted small">Tap what the customer is buying.</p></div></div>
+  <div class="cols sellcols">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <input class="search" id="search" type="search" placeholder="Search your items" aria-label="Search your items" value="${esc(S.search)}">
+      <div class="grid" id="grid">${gridHtml()}</div>
+    </div>
+    <div class="slipwrap" id="slipwrap">${slipHtml()}</div>
+  </div>
+  ${S.cart.length ? `<button class="jump" data-act="toslip"><span>${cartCount()} item(s)</span><span class="num">${M(cartTotal())} · View slip</span></button>` : ""}`;
+function gridHtml() {
+  const q = S.search.trim().toLowerCase(), list = products().filter(p => !q || String(p.name).toLowerCase().includes(q));
+  return list.map(p => `<button class="prod" data-act="add" data-id="${p.id}"><b>${esc(p.name)}</b><span class="p num">${M(p.price)}</span><span class="q ${isLow(p) ? "low" : ""}">${p.qty <= 0 ? "Out of stock" : p.qty + " left"}</span></button>`).join("")
+    + `<button class="prod other" data-act="other"><b>Other amount</b><span class="q">Type a total, for sales you did not list item by item</span></button>`
+    + (products().length ? "" : `<button class="prod other" data-act="product"><b>Add an item</b><span class="q">Put your stock in so you can tap to sell</span></button>`);
+}
+const cartTotal = () => sum(S.cart, l => l.price * l.qty);
+const cartCount = () => S.cart.reduce((t, l) => t + l.qty, 0);
+function changeHtml() {
+  if (S.tender === "" || !S.cart.length) return `<span>CHANGE</span><span class="num muted">M 0.00</span>`;
+  const d = r2(Number(S.tender) - cartTotal());
+  return d >= 0 ? `<span>CHANGE</span><span class="num chg">${M(d)}</span>` : `<span class="neg">STILL SHORT</span><span class="num neg">${M(-d)}</span>`;
+}
+function slipHtml() {
+  const cs = customers();
+  return `<div class="slip" id="slip"><h2>${esc(S.shop.name || "Till slip")}</h2><div class="dash"></div>
+    ${S.cart.length ? S.cart.map((l, i) => `<div class="sl"><span class="n">${esc(l.name)}<br><span class="muted">@ ${M(l.price)}</span></span>
+      <span class="qty"><button data-act="dec" data-i="${i}" aria-label="One less ${esc(l.name)}">−</button><span class="num">${l.qty}</span><button data-act="inc" data-i="${i}" aria-label="One more ${esc(l.name)}">+</button></span>
+      <span class="num">${M(l.price * l.qty)}</span></div>`).join("") : `<p class="muted" style="text-align:center">No items yet</p>`}
+    <div class="dash"></div>
+    <div class="total"><span>TOTAL</span><span class="num">${M(cartTotal())}</span></div>
+    <div class="seg" role="group" aria-label="How they paid">${Object.keys(PAY).map(k => `<button type="button" class="${S.pay === k ? "on" : ""}" data-act="pay" data-pay="${k}">${PAY[k]}</button>`).join("")}</div>
+    ${S.pay === "cash" ? `<div class="field"><label for="tender">Cash the customer gave you (M)</label><input id="tender" ${money} placeholder="0.00" value="${esc(S.tender)}">
+      <div class="chips" role="group" aria-label="Add a note or coin">${[5, 10, 20, 50, 100, 200].map(v => `<button type="button" data-act="note" data-v="${v}">+${v}</button>`).join("")}<button type="button" data-act="note" data-v="exact">Exact</button><button type="button" data-act="note" data-v="clear">Clear</button></div></div>
+      <div class="total" id="changeline">${changeHtml()}</div>` : ""}
+    ${S.pay === "credit" ? `<div class="field"><label for="salecust">Who is taking on credit?</label>
+      <select id="salecust"><option value="">Choose customer</option>${cs.map(c => `<option value="${c.id}" ${S.cust === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+      <button type="button" class="btn sm" data-act="customer">Add new customer</button></div>` : ""}
+    <div class="field"><label for="saledate">Date of sale</label><input id="saledate" type="date" value="${S.saleDate}" max="${today()}"></div>
+    <button class="btn primary" data-act="savesale" ${S.cart.length ? "" : "disabled"}>Save sale ${S.cart.length ? M(cartTotal()) : ""}</button>
+    ${S.cart.length ? `<button class="btn sm" data-act="clearcart">Clear slip</button>` : ""}
+  </div>`;
+}
+
+views.stock = () => {
+  const ps = products(), value = sum(ps, p => Math.max(0, p.qty) * p.cost);
+  return `
+  <div class="head"><div><h1>Stock</h1><p class="muted small">${ps.length} items · worth ${M(value)} at cost</p></div>
+    <div class="actions"><button class="btn primary" data-act="receive">Receive stock</button><button class="btn" data-act="product">Add item</button></div></div>
+  <div class="card"><div class="list">${ps.length ? ps.map(p => `<div class="row"><div class="grow"><b>${esc(p.name)}</b><span class="muted small num">Sell ${M(p.price)} · Cost ${M(p.cost)} · Profit ${M(p.price - p.cost)} each</span></div>
+      <span class="pill ${p.qty <= 0 ? "bad" : isLow(p) ? "warn" : "good"} num">${p.qty <= 0 ? "Out" : p.qty + " left"}</span>
+      <button class="btn sm" data-act="product" data-id="${p.id}">Edit</button></div>`).join("") : `<p class="empty">No items yet. Add the things you sell, then use Receive stock each time you buy from a wholesaler.</p>`}</div></div>
+  <div class="card"><h2>Stock you bought</h2><div class="list">${recent("buy", 15) || `<p class="empty">No stock purchases recorded yet.</p>`}</div></div>`;
+};
+function recent(kind, n) {
+  return entries(kind, null, null, true).sort((a, b) => b.date.localeCompare(a.date) || (b.t || 0) - (a.t || 0)).slice(0, n).map(e => {
+    const title = kind === "buy" ? (e.supplier || "Supplier") + (e.inv ? " · inv " + e.inv : "") : (e.desc || e.cat);
+    const sub = nice(e.date) + (kind === "exp" ? " · " + e.cat : "") + (e.void ? " · cancelled" : "");
+    return `<div class="row ${e.void ? "void" : ""}"><div class="grow"><b>${esc(title)}</b><span class="muted small">${esc(sub)}</span></div>
+      ${e.void ? "" : `<span class="pill ${e.receipt ? "good" : "warn"}">${e.receipt ? "Receipt kept" : "No receipt"}</span>`}
+      <span class="amt num">${M(e.amt)}</span>
+      ${e.void ? "" : `<button class="btn sm danger" data-act="void" data-kind="${kind}" data-date="${e.date}" data-id="${e.id}">Cancel</button>`}</div>`;
+  }).join("");
+}
+
+views.spend = () => {
+  const t = today(), from = t.slice(0, 8) + "01", list = entries("exp", from, addDays(t, 1)), by = {};
+  list.forEach(e => by[e.cat] = r2((by[e.cat] || 0) + e.amt));
+  return `
+  <div class="head"><div><h1>Spending</h1><p class="muted small">Shop running costs. Stock goes under Stock.</p></div>
+    <div class="actions"><button class="btn primary" data-act="expense">Add expense</button></div></div>
+  <div class="cols">
+    <div class="card"><h2>Recent expenses</h2><div class="list">${recent("exp", 30) || `<p class="empty">No expenses yet. Add rent, electricity, transport and other shop costs here.</p>`}</div></div>
+    <div class="card"><h2>${MONTHS[Number(t.slice(5, 7)) - 1]} so far</h2><div class="list">
+      ${Object.keys(by).sort((a, b) => by[b] - by[a]).map(c => `<div class="row"><div class="grow">${esc(c)}</div><span class="amt num">${M(by[c])}</span></div>`).join("") || `<p class="empty">Nothing this month.</p>`}
+      <div class="row"><div class="grow"><b>Total</b></div><span class="amt num">${M(sum(list, e => e.amt))}</span></div></div></div>
+  </div>`;
+};
+
+views.credit = () => {
+  const b = balances(), cs = customers(), owed = sum(cs, c => Math.max(0, b[c.id] || 0));
+  return `
+  <div class="head"><div><h1>Sekoloto</h1><p class="muted small">Customers owe you ${M(owed)} in total.</p></div>
+    <div class="actions"><button class="btn primary" data-act="customer">Add customer</button></div></div>
+  <div class="card"><div class="list">${cs.length ? cs.sort((x, y) => (b[y.id] || 0) - (b[x.id] || 0)).map(c => { const v = b[c.id] || 0; return `<div class="row"><div class="grow"><b>${esc(c.name)}</b><span class="muted small">${esc(c.phone || "No phone number")}</span></div>
+      <span class="pill ${v > 0 ? "warn" : "good"} num">${v > 0 ? "Owes " + M(v) : v < 0 ? "In credit " + M(-v) : "Paid up"}</span>
+      <button class="btn sm" data-act="payment" data-id="${c.id}">Record payment</button></div>`; }).join("") : `<p class="empty">No credit customers yet. Add one, then choose Sekoloto when you save their sale.</p>`}</div></div>`;
+};
+
+views.tax = () => {
+  const cur = taxYearOf(today()), years = new Set([cur]); Object.keys(S.days).forEach(d => years.add(taxYearOf(d)));
+  const y = S.taxYear && years.has(S.taxYear) ? S.taxYear : cur, [from, to] = taxRange(y);
+  const sales = saleSum(from, to), buy = buySum(from, to), exp = expSum(from, to), profit = r2(sales - buy - exp);
+  const pct = Math.min(100, sales / VAT_LIMIT * 100), stockVal = sum(products(), p => Math.max(0, p.qty) * p.cost);
+  const rows = []; let d = from;
+  for (let i = 0; i < 12; i++) { const y2 = Number(d.slice(0, 4)), m = Number(d.slice(5, 7)), nx = (m === 12 ? y2 + 1 : y2) + "-" + String(m === 12 ? 1 : m + 1).padStart(2, "0") + "-01"; rows.push([MONTHS[m - 1] + " " + y2, saleSum(d, nx), buySum(d, nx), expSum(d, nx)]); d = nx; }
+  const by = {}; entries("exp", from, to).forEach(e => by[e.cat] = r2((by[e.cat] || 0) + e.amt));
+  const noSlip = entries("exp", from, to).concat(entries("buy", from, to)).filter(e => !e.receipt);
+  return `
+  <div class="head"><div><h1>Tax records</h1><p class="muted small">${esc(S.shop.name || "Shop name not set")} · TIN ${esc(S.shop.tin || "not set")}</p></div>
+    <div class="actions"><div class="field"><label for="taxyear" class="small">Tax year</label><select id="taxyear">${[...years].sort((a, b) => b - a).map(v => `<option value="${v}" ${v === y ? "selected" : ""}>${taxLabel(v)}</option>`).join("")}</select></div>
+      <button class="btn" data-act="shop">Shop details</button></div></div>
+  <p class="muted small">${nice(from)} to ${nice(addDays(to, -1))}</p>
+  <div class="tiles">
+    <div class="tile hi"><span>Sales (turnover)</span><b class="num">${M(sales)}</b></div>
+    <div class="tile"><span>Stock bought</span><b class="num">${M(buy)}</b></div>
+    <div class="tile"><span>Other expenses</span><b class="num">${M(exp)}</b></div>
+    <div class="tile"><span>Profit (estimate)</span><b class="num ${profit < 0 ? "neg" : ""}">${M(profit)}</b></div>
+  </div>
+  <div class="cols">
+    <div class="card"><h2>Month by month</h2><div class="tablewrap"><table class="num"><thead><tr><th>Month</th><th>Sales</th><th>Stock bought</th><th>Expenses</th><th>Profit</th></tr></thead>
+      <tbody>${rows.map(r => { const p = r2(r[1] - r[2] - r[3]); return `<tr><td>${r[0]}</td><td>${M(r[1])}</td><td>${M(r[2])}</td><td>${M(r[3])}</td><td class="${p < 0 ? "neg" : ""}">${M(p)}</td></tr>`; }).join("")}</tbody>
+      <tfoot><tr><td>Year</td><td>${M(sales)}</td><td>${M(buy)}</td><td>${M(exp)}</td><td class="${profit < 0 ? "neg" : ""}">${M(profit)}</td></tr></tfoot></table></div>
+      <p class="muted small">Profit here is sales minus stock bought minus expenses. Stock still on your shelves is worth ${M(stockVal)} at cost today.</p>
+      <div class="actions"><button class="btn primary" data-act="csv" data-year="${y}">Download records (CSV)</button><button class="btn" data-act="copysum" data-year="${y}">Copy summary</button></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card"><h2>VAT check</h2><div class="meter"><i class="${pct >= 100 ? "bad" : pct >= 80 ? "warn" : ""}" style="width:${Math.max(1, pct)}%"></i></div>
+        <p class="small"><b class="num">${M(sales)}</b> of the M 2,000,000 yearly turnover where VAT registration becomes compulsory. ${pct >= 100 ? `<span class="pill bad">Over the limit. Talk to RSL.</span>` : pct >= 80 ? `<span class="pill warn">Getting close</span>` : `<span class="pill good">Below the limit</span>`}</p></div>
+      <div class="card"><h2>Receipts</h2>${noSlip.length ? `<p><span class="pill warn">${noSlip.length} without a receipt</span></p><p class="small muted">Worth ${M(sum(noSlip, e => e.amt))}. Find the slips or invoices and keep them with your records.</p>` : `<p><span class="pill good">Every cost has a receipt</span></p>`}</div>
+      <div class="card"><h2>Expenses by type</h2><div class="list">${Object.keys(by).sort((a, b) => by[b] - by[a]).map(c => `<div class="row"><div class="grow">${esc(c)}</div><span class="amt num">${M(by[c])}</span></div>`).join("") || `<p class="empty">No expenses in this tax year.</p>`}</div></div>
+      ${S.mode === "offline" ? `<div class="card"><h2>Sync with your other device</h2>${syncOn()
+        ? `<p><span class="pill ${SY.err && SY.err !== "offline" ? "bad" : pendingCount() ? "warn" : "good"}">${SY.err && SY.err !== "offline" ? "Sync problem" : pendingCount() ? pendingCount() + " change(s) waiting for internet" : "Up to date"}</span></p>
+           <p class="small muted">${SY.err && SY.err !== "offline" ? esc(SY.err) : SY.last ? "Last synced " + new Date(SY.last).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + ". It syncs by itself whenever this device has internet." : "Not synced yet."}</p>
+           <div class="actions"><button class="btn primary" data-act="syncnow">Sync now</button><button class="btn" data-act="copysetup">Copy setup code for another device</button><button class="btn danger" data-act="syncoff">Turn off</button></div>`
+        : `<p class="small muted">Work offline here, and the records send themselves to your phone whenever this device gets internet, even a few minutes of hotspot.</p><div class="actions"><button class="btn primary" data-act="syncsetup">Set up sync</button></div>`}</div>` : ""}
+      <div class="card"><h2>Backup</h2><p class="small muted">${S.mode === "offline" && !syncOn() ? "Your records are saved on this device only. Save a backup file often and keep a copy on a USB stick or your phone." : "Save a copy of all your records as a file now and then, as a spare."}${lastBackup() ? " Last backup: " + nice(lastBackup()) + "." : ""}</p>
+        <div class="actions"><button class="btn" data-act="backup">Save a backup file</button><button class="btn" data-act="restore">Restore from a backup</button></div></div>
+      <div class="card"><h2>Before you ask for tax clearance</h2><div class="list">
+        <div class="row"><div class="grow">Returns are filed up to date</div></div>
+        <div class="row"><div class="grow">No tax is still owing to RSL</div></div>
+        <div class="row"><div class="grow">These records and your receipts back up the figures you filed</div></div></div>
+        <p class="muted small">These figures are a record to work from, not a tax return. Check your filing duties with RSL or an accountant.</p></div>
+    </div>
+  </div>`;
+};
+
+/* ---------- rendering ---------- */
+function paintNav() {
+  const html = NAV.map(([k, l]) => `<a href="#${k}" class="${S.view === k ? "on" : ""}" ${S.view === k ? 'aria-current="page"' : ""}>${l}</a>`).join("");
+  $("#tabs").innerHTML = html;
+  $("#side").innerHTML = `<div class="brand"><i></i><span>${esc(S.shop.name || "Spaza Shop Books")}</span></div>` + html + `<span class="status" id="status2"></span>`;
+  $("#shopname").textContent = S.shop.name || "Spaza Shop Books";
+  paintStatus();
+}
+function paintStatus() {
+  let t = "Saved", c = "ok";
+  if (S.mode === "loading") { t = "Loading"; c = ""; }
+  else if (S.mode === "offline") {
+    const n = syncOn() ? pendingCount() : 0, bad = syncOn() && SY.err && SY.err !== "offline";
+    t = S.storageBad ? "Not saving" : S.pending > 0 ? "Saving" : !syncOn() ? "Saved on this device" : syncing ? "Syncing" : bad ? "Sync problem" : n ? "Saved · " + n + " to sync" : "Synced";
+    c = S.storageBad || bad ? "warn" : "ok"; }
+  else if (S.mode === "blocked") { t = "Not connected"; c = "warn"; }
+  else if (S.pending > 0) { t = "Saving"; c = ""; }
+  else if (S.stale) { t = "May be out of date"; c = "warn"; }
+  ["#status1", "#status2"].forEach(s => { const e = $(s); if (e) { e.textContent = t; e.className = "status " + c; } });
+}
+function render() {
+  const a = document.activeElement, keep = a && a.id && $("#view").contains(a) ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null;
+  const ban = $("#banner");
+  const msg = S.storageBad ? "This browser is not keeping your records. Close any private or incognito window and open the file in normal Chrome."
+    : S.mode === "blocked" ? "Your records can't be reached. Open this page while signed in to Claude with the shop's account."
+    : S.readonly ? "This account can view the records but can't add or change them."
+    : S.slow ? "Still trying to reach your records. What you see may be out of date." : "";
+  ban.hidden = !msg; ban.className = "banner"; ban.textContent = msg;
+  const ready = Object.values(S.got).every(Boolean);
+  $("#view").innerHTML = S.mode === "blocked" ? "" : !ready ? `<div class="card"><h2>Opening your books</h2><p class="muted">Fetching your records.</p></div>` : `<div style="display:flex;flex-direction:column;gap:16px">${views[S.view]()}</div>`;
+  paintNav(); watchSlip();
+  if (keep) { const e = document.getElementById(keep.id); if (e) { e.focus(); try { e.setSelectionRange(keep.s, keep.e); } catch (x) {} } }
+}
+let slipIO = null;
+function watchSlip() {
+  if (slipIO) { slipIO.disconnect(); slipIO = null; }
+  const j = $(".jump"), w = $("#slipwrap"); if (!j || !w || !window.IntersectionObserver) return;
+  slipIO = new IntersectionObserver(es => { j.hidden = es[0].isIntersecting; }); slipIO.observe(w);
+}
+function route() { const h = location.hash.slice(1); S.view = views[h] ? h : "today"; render(); window.scrollTo(0, 0); }
+let toastT; function toast(m) { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+
+/* ---------- sheets (forms) ---------- */
+let onSubmit = null;
+function sheet(title, body, okLabel, submit, extra) {
+  onSubmit = submit;
+  $("#sheet").innerHTML = `<form novalidate><h2>${esc(title)}</h2>${body}<p class="err" id="formerr" hidden></p><div class="sheetbtns">${extra || ""}<button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" type="submit">${esc(okLabel)}</button></div></form>`;
+  $("#sheet").hidden = false;
+  const f = $("#sheet input, #sheet select"); if (f) f.focus();
+}
+function closeSheet() { $("#sheet").hidden = true; $("#sheet").innerHTML = ""; onSubmit = null; }
+function formErr(m) { const e = $("#formerr"); e.textContent = m; e.hidden = false; }
+const val = id => { const e = document.getElementById(id); return e ? (e.type === "checkbox" ? e.checked : e.value.trim()) : ""; };
+const numv = id => { const v = val(id); return v === "" ? NaN : Number(v); };
+const fld = (id, label, attrs, value) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" ${attrs || ""} value="${esc(value ?? "")}"></div>`;
+const money = 'type="number" inputmode="decimal" min="0" step="0.01"';
+
+function productSheet(id) {
+  const p = id ? Object.assign({}, S.products[id], { qty: stock()[id] || 0 }) : null;
+  sheet(p ? "Edit item" : "Add item",
+    fld("pname", "Item name", 'type="text" maxlength="60" placeholder="e.g. Bread, brown loaf"', p && p.name) +
+    `<div class="two">${fld("pprice", "Selling price (M)", money, p && p.price)}${fld("pcost", "Cost price (M)", money, p && p.cost)}</div>
+     <div class="two">${fld("pqty", p ? "In stock now (correct if wrong)" : "In stock now", 'type="number" inputmode="numeric" step="1"', p ? p.qty : "")}${fld("plow", "Warn me at or below", 'type="number" inputmode="numeric" min="0" step="1"', p ? p.low : 5)}</div>`,
+    "Save item", async () => {
+      const name = val("pname"), price = numv("pprice"), cost = numv("pcost"), qty = numv("pqty"), low = numv("plow");
+      if (!name) return formErr("Type the item name.");
+      if (!(price >= 0) || !(cost >= 0)) return formErr("Fill in the selling price and the cost price.");
+      if (!Number.isFinite(qty)) return formErr("Type how many you have in stock (0 if none).");
+      const pid = id || uid(), diff = Math.round(qty) - (p ? p.qty : 0);
+      await prodSet(pid, { name, price: r2(price), cost: r2(cost), low: Number.isFinite(low) ? Math.round(low) : 0, u: Date.now() });
+      if (diff) await dayPut(today(), "adj", uid(), { t: Date.now(), p: pid, d: diff, why: p ? "count" : "opening" });
+      toast("Item saved");
+    }, p ? `<button type="button" class="btn danger" data-act="archive" data-id="${id}">Remove item</button>` : "");
+}
+function expenseSheet() {
+  sheet("Add expense",
+    `<div class="two"><div class="field"><label for="ecat">Type</label><select id="ecat">${EXP_CATS.map(c => `<option>${c}</option>`).join("")}</select></div>${fld("eamt", "Amount (M)", money)}</div>` +
+    fld("edesc", "What was it for?", 'type="text" maxlength="80" placeholder="e.g. Taxi to wholesaler"') + fld("edate", "Date", `type="date" max="${today()}"`, today()) +
+    `<label class="check"><input type="checkbox" id="erec" checked> I have the receipt or slip</label>`,
+    "Save expense", async () => {
+      const amt = numv("eamt"), date = val("edate");
+      if (!(amt > 0)) return formErr("Type the amount you paid.");
+      if (!date || date > today()) return formErr("Pick a date that is today or earlier.");
+      await dayPut(date, "exp", uid(), { t: Date.now(), cat: val("ecat"), desc: val("edesc"), amt: r2(amt), receipt: val("erec") });
+      toast("Expense saved");
+    });
+}
+function recvRows() {
+  const ps = products();
+  return S.recv.map((l, i) => `<div class="line"><div><label class="small" for="rp${i}">Item</label><select id="rp${i}" data-recv="${i}" data-f="p"><option value="">Choose</option>${ps.map(p => `<option value="${p.id}" ${l.p === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+    <div><label class="small" for="rq${i}">Qty</label><input id="rq${i}" data-recv="${i}" data-f="q" type="number" inputmode="numeric" min="1" step="1" value="${esc(l.q)}"></div>
+    <div><label class="small" for="rc${i}">Cost each</label><input id="rc${i}" data-recv="${i}" data-f="c" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(l.c)}"></div>
+    <button type="button" data-act="recvdel" data-i="${i}" aria-label="Remove line">×</button></div>`).join("");
+}
+const recvTotal = () => sum(S.recv, l => (Number(l.q) || 0) * (Number(l.c) || 0));
+function receiveSheet() {
+  if (!products().length) { toast("Add your items first, then receive stock."); return productSheet(); }
+  S.recv = [{ p: "", q: "", c: "" }];
+  sheet("Receive stock",
+    `<div class="two">${fld("rsup", "Supplier", 'type="text" maxlength="60" placeholder="e.g. Wholesaler name"')}${fld("rinv", "Invoice number", 'type="text" maxlength="40"')}</div>` +
+    fld("rdate", "Date", `type="date" max="${today()}"`, today()) +
+    `<div id="recvrows" style="display:flex;flex-direction:column;gap:8px">${recvRows()}</div>
+     <button type="button" class="btn sm" data-act="recvadd">Add another item</button>
+     <div class="total"><span>Total paid</span><span class="num" id="recvtotal">${M(0)}</span></div>
+     <label class="check"><input type="checkbox" id="rrec" checked> I have the invoice or slip</label>`,
+    "Save stock", async () => {
+      const date = val("rdate"), lines = S.recv.filter(l => l.p || l.q || l.c);
+      if (!lines.length) return formErr("Add at least one item.");
+      for (const l of lines) if (!l.p || !S.products[l.p] || !(Number(l.q) > 0) || !(Number(l.c) >= 0) || l.c === "") return formErr("Each line needs an item, a quantity and the cost of one.");
+      if (!date || date > today()) return formErr("Pick a date that is today or earlier.");
+      const add = {}; lines.forEach(l => { add[l.p] = add[l.p] || { q: 0, c: 0 }; add[l.p].q += Math.round(Number(l.q)); add[l.p].c = r2(Number(l.c)); });
+      await dayPut(date, "buy", uid(), { t: Date.now(), supplier: val("rsup"), inv: val("rinv"), receipt: val("rrec"), amt: recvTotal(),
+        items: lines.map(l => ({ p: l.p, n: S.products[l.p].name, q: Math.round(Number(l.q)), c: r2(Number(l.c)) })) });
+      await Promise.all(Object.keys(add).map(id => prodUpd(id, { cost: add[id].c, u: Date.now() })));
+      toast("Stock received");
+    });
+}
+function customerSheet() {
+  sheet("Add customer", fld("cname", "Name", 'type="text" maxlength="60"') + fld("cphone", "Phone number (optional)", 'type="tel" maxlength="20"'), "Save customer", async () => {
+    const name = val("cname"); if (!name) return formErr("Type the customer's name.");
+    const id = uid(); await write("customers/" + id, () => db.doc("customers/" + id).set({ name, phone: val("cphone"), u: Date.now() }));
+    if (S.view === "sell") { S.cust = id; S.pay = "credit"; }
+    toast("Customer saved");
+  });
+}
+function paymentSheet(id) {
+  const c = S.customers[id], owes = balances()[id] || 0;
+  sheet("Payment from " + (c ? c.name : "customer"), `<p class="muted">Owes ${M(Math.max(0, owes))}</p>` + fld("yamt", "Amount paid (M)", money, owes > 0 ? owes : "") + fld("ydate", "Date", `type="date" max="${today()}"`, today()), "Save payment", async () => {
+    const amt = numv("yamt"), date = val("ydate");
+    if (!(amt > 0)) return formErr("Type the amount they paid.");
+    if (!date || date > today()) return formErr("Pick a date that is today or earlier.");
+    await dayPut(date, "pay", uid(), { t: Date.now(), cust: id, amt: r2(amt) });
+    toast("Payment saved");
+  });
+}
+function shopSheet() {
+  sheet("Shop details", fld("sname", "Shop name", 'type="text" maxlength="60"', S.shop.name) + fld("stin", "TIN (tax number)", 'type="text" maxlength="30"', S.shop.tin) +
+    `<div class="field"><label for="sstart">Tax year starts in</label><select id="sstart">${MONTHS.map((m, i) => `<option value="${i + 1}" ${startMonth() === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+     <p class="muted small">April is set by default. Change it only if RSL gave you a different year.</p>`, "Save details", async () => {
+    await write("meta/shop", () => db.doc("meta/shop").set({ name: val("sname"), tin: val("stin"), yearStart: Number(val("sstart")) || 4, u: Date.now() }));
+    toast("Shop details saved");
+  });
+}
+function otherSheet() {
+  sheet("Other amount", fld("oname", "Description", 'type="text" maxlength="60"', "Sales, not itemised") + fld("oamt", "Amount (M)", money), "Add to slip", async () => {
+    const amt = numv("oamt"); if (!(amt > 0)) return formErr("Type the amount.");
+    S.cart.push({ pid: null, name: val("oname") || "Sales, not itemised", price: r2(amt), cost: null, qty: 1 });
+  });
+}
+function voidSheet(kind, date, id) {
+  sheet("Cancel this entry?", `<p>It stays in your records but is crossed out and no longer counted.${kind === "sales" ? " Items go back into stock." : kind === "buy" ? " The stock it added is taken off again." : ""}</p>`, "Yes, cancel it", async () => {
+    const e = ((S.days[date] || {})[kind] || {})[id]; if (!e || e.void) return;
+    await dayPut(date, kind, id, { void: true });
+    toast("Entry cancelled");
+  });
+  $("#sheet [data-act=close]").textContent = "Keep it";
+}
+async function saveSale() {
+  if (!S.cart.length) return;
+  if (S.pay === "credit" && !S.customers[S.cust]) return toast("Choose who is taking on credit.");
+  if (!S.saleDate || S.saleDate > today()) return toast("Pick a sale date that is today or earlier.");
+  const cart = S.cart, total = cartTotal(), paid = S.pay === "cash" && S.tender !== "" ? r2(Number(S.tender)) : null;
+  if (paid !== null && paid < total) return toast("The cash is " + M(total - paid) + " short of the total.");
+  const sale = { t: Date.now(), total, pay: S.pay, cust: S.pay === "credit" ? S.cust : null, items: cart.map(l => ({ p: l.pid, n: l.name, q: l.qty, pr: l.price, c: l.cost })) };
+  if (paid !== null) { sale.paid = paid; sale.change = r2(paid - total); }
+  try {
+    await dayPut(S.saleDate, "sales", uid(), sale);
+    S.cart = []; S.pay = "cash"; S.cust = ""; S.tender = ""; S.saleDate = today();
+    toast("Sale saved · " + M(total) + (paid !== null ? " · Change " + M(paid - total) : "")); render();
+  } catch (e) { fail(e); }
+}
+
+/* ---------- export ---------- */
+function yearRows(y) {
+  const [from, to] = taxRange(y), rows = [["Date", "Type", "Description", "Paid by / category", "Amount (M)", "Receipt", "Reference"]];
+  const all = [];
+  entries("sales", from, to).forEach(e => all.push([e.date, "Sale", (e.items || []).map(i => i.q + " x " + i.n).join("; "), PAY[e.pay] + (e.cust && S.customers[e.cust] ? " - " + S.customers[e.cust].name : ""), e.total, "", e.id]));
+  entries("buy", from, to).forEach(e => all.push([e.date, "Stock bought", (e.supplier || "") + ": " + (e.items || []).map(i => i.q + " x " + i.n).join("; "), "Stock", -e.amt, e.receipt ? "Yes" : "No", e.inv || e.id]));
+  entries("exp", from, to).forEach(e => all.push([e.date, "Expense", e.desc || "", e.cat, -e.amt, e.receipt ? "Yes" : "No", e.id]));
+  all.sort((a, b) => a[0].localeCompare(b[0]));
+  return rows.concat(all);
+}
+const csvOf = rows => rows.map(r => r.map(c => { const s = String(c ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\r\n");
+function summaryText(y) {
+  const [from, to] = taxRange(y), s = saleSum(from, to), b = buySum(from, to), x = expSum(from, to);
+  return [(S.shop.name || "Shop") + " · TIN " + (S.shop.tin || "not set"), "Tax year " + taxLabel(y) + " (" + nice(from) + " to " + nice(addDays(to, -1)) + ")",
+    "Sales (turnover): " + M(s), "Stock bought: " + M(b), "Other expenses: " + M(x), "Profit (estimate): " + M(s - b - x)].join("\n");
+}
+async function saveFile(name, text) {
+  if (S.mode !== "live") {
+    try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast("Saved as " + name + " in your Downloads folder"); return true; }
+    catch (e) { toast("Could not save the file."); return false; }
+  }
+  let dl = null; try { dl = await window.claude.use("downloads"); } catch (e) {}
+  if (!dl) { toast("Downloads are not available in this view."); return false; }
+  try { await dl.save({ filename: name, data: text }); toast("Saved as " + name); return true; }
+  catch (e) { if (!e || e.code !== "declined") toast("Could not save the file here."); return false; }
+}
+const downloadCsv = y => saveFile("shop-records-" + taxLabel(y).replace("/", "-") + ".csv", "﻿" + csvOf(yearRows(y)));
+function allDocs() {
+  const docs = {};
+  for (const d in S.days) docs["days/" + d] = S.days[d];
+  for (const i in S.products) docs["products/" + i] = S.products[i];
+  for (const i in S.customers) docs["customers/" + i] = S.customers[i];
+  if (Object.keys(S.shop).length) docs["meta/shop"] = S.shop;
+  return docs;
+}
+const lastBackup = () => { try { return localStorage.getItem("spaza-last-backup") || ""; } catch (e) { return ""; } };
+async function backup() {
+  const ok = await saveFile("spaza-backup-" + today() + ".json", JSON.stringify({ app: "spaza-shop-books", v: 1, at: today(), docs: allDocs() }));
+  if (ok) { try { localStorage.setItem("spaza-last-backup", today()); } catch (e) {} render(); }
+}
+function restoreSheet() {
+  sheet("Restore from a backup", `<p>Choose a backup file you saved before (spaza-backup-….json). ${S.mode === "live" ? "Its records are added over what is here." : "It <b>replaces</b> everything on this device with what is in the file."}</p>
+    <div class="field"><label for="bfile">Backup file</label><input id="bfile" type="file" accept=".json,application/json"></div>`, "Restore", async () => {
+    const f = document.getElementById("bfile").files[0]; if (!f) return formErr("Choose the backup file first.");
+    let b; try { b = JSON.parse(await f.text()); } catch (e) { return formErr("That file can't be read. Choose a spaza-backup file."); }
+    if (!b || b.app !== "spaza-shop-books" || !b.docs || typeof b.docs !== "object") return formErr("That is not a Spaza Shop Books backup file.");
+    const paths = Object.keys(b.docs).filter(p => /^(days|products|customers)\/[\w.\-~:@+]+$/.test(p) || p === "meta/shop");
+    if (db.replaceAll) { const docs = {}; paths.forEach(p => docs[p] = b.docs[p]); await db.replaceAll(docs); SY.rev = 0; sySave(); kick(500); }
+    else for (const p of paths) await write(p, () => db.doc(p).set(b.docs[p]));
+    toast("Restored the backup from " + nice(b.at || today()));
+  });
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", async ev => {
+  const el = ev.target.closest("[data-act]"); if (!el) { if (ev.target.id === "sheet") closeSheet(); return; }
+  const a = el.dataset.act, id = el.dataset.id;
+  if (a === "close") { closeSheet(); return render(); }
+  if (a === "product") return productSheet(id);
+  if (a === "expense") return expenseSheet();
+  if (a === "receive") return receiveSheet();
+  if (a === "customer") return customerSheet();
+  if (a === "payment") return paymentSheet(id);
+  if (a === "shop") return shopSheet();
+  if (a === "other") return otherSheet();
+  if (a === "void") return voidSheet(el.dataset.kind, el.dataset.date, id);
+  if (a === "archive") { closeSheet(); try { await prodUpd(id, { archived: true, u: Date.now() }); toast("Item removed"); } catch (e) { fail(e); } return; }
+  if (a === "recvadd") { S.recv.push({ p: "", q: "", c: "" }); $("#recvrows").innerHTML = recvRows(); return; }
+  if (a === "recvdel") { S.recv.splice(Number(el.dataset.i), 1); if (!S.recv.length) S.recv.push({ p: "", q: "", c: "" }); $("#recvrows").innerHTML = recvRows(); $("#recvtotal").textContent = M(recvTotal()); return; }
+  if (a === "add") { const p = S.products[id]; if (!p) return; const l = S.cart.find(x => x.pid === id); if (l) l.qty++; else S.cart.push({ pid: id, name: p.name, price: Number(p.price), cost: Number(p.cost), qty: 1 }); return render(); }
+  if (a === "inc") { S.cart[el.dataset.i].qty++; return render(); }
+  if (a === "dec") { const l = S.cart[el.dataset.i]; if (--l.qty <= 0) S.cart.splice(el.dataset.i, 1); return render(); }
+  if (a === "pay") { S.pay = el.dataset.pay; return render(); }
+  if (a === "note") { const v = el.dataset.v; S.tender = v === "clear" ? "" : v === "exact" ? String(cartTotal()) : String(r2((Number(S.tender) || 0) + Number(v))); return render(); }
+  if (a === "backup") return backup();
+  if (a === "syncsetup") return syncSheet();
+  if (a === "syncnow") return syncNow(true);
+  if (a === "copysql" || a === "copysetup") { try { await navigator.clipboard.writeText(a === "copysql" ? SQL : setupCode()); toast(a === "copysql" ? "Script copied. Paste it in the Supabase SQL Editor." : "Setup code copied. Send it to your other device."); } catch (e) { toast("Could not copy here."); } return; }
+  if (a === "syncoff") { Object.assign(SY, { url: "", key: "", code: "", rev: 0, dirty: {}, last: 0, err: "" }); sySave(); toast("Sync is off. Records stay on this device."); return render(); }
+  if (a === "restore") return restoreSheet();
+  if (a === "clearcart") { S.cart = []; S.tender = ""; return render(); }
+  if (a === "toslip") { $("#slipwrap").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (a === "savesale") { el.disabled = true; return saveSale(); }
+  if (a === "csv") return downloadCsv(Number(el.dataset.year));
+  if (a === "copysum") { try { await navigator.clipboard.writeText(summaryText(Number(el.dataset.year))); toast("Summary copied"); } catch (e) { toast("Could not copy here."); } return; }
+});
+document.addEventListener("submit", async ev => {
+  ev.preventDefault(); if (!onSubmit) return;
+  const btn = ev.target.querySelector("[type=submit]"); btn.disabled = true;
+  try { const r = await onSubmit(); const e = $("#formerr"); if (e && !e.hidden && r === undefined && e.textContent) { btn.disabled = false; return; } closeSheet(); render(); }
+  catch (e) { btn.disabled = false; fail(e); }
+});
+document.addEventListener("input", ev => {
+  const t = ev.target;
+  if (t.id === "search") { S.search = t.value; $("#grid").innerHTML = gridHtml(); }
+  else if (t.id === "tender") { S.tender = t.value; $("#changeline").innerHTML = changeHtml(); }
+  else if (t.dataset.recv !== undefined) { S.recv[t.dataset.recv][t.dataset.f] = t.value;
+    if (t.dataset.f === "p" && S.products[t.value] && !S.recv[t.dataset.recv].c) { S.recv[t.dataset.recv].c = S.products[t.value].cost; const c = document.getElementById("rc" + t.dataset.recv); if (c) c.value = S.products[t.value].cost; }
+    $("#recvtotal").textContent = M(recvTotal()); }
+  else if (t.closest("#sheet")) { const e = $("#formerr"); if (e) { e.hidden = true; e.textContent = ""; } }
+});
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.id === "salecust") S.cust = t.value;
+  else if (t.id === "saledate") S.saleDate = t.value;
+  else if (t.id === "taxyear") { S.taxYear = Number(t.value); render(); }
+});
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
+window.addEventListener("hashchange", route);
+
+/* ---------- start ---------- */
+function listen() {
+  const slowT = setTimeout(() => { S.slow = true; render(); }, 10000);
+  const got = (k, meta) => { S.got[k] = true; if (meta && !meta.fromCache) { clearTimeout(slowT); S.slow = false; S.stale = false; } else if (meta && meta.fromCache) S.stale = true; if ($("#sheet").hidden) render(); else paintNav(); };
+  const dead = () => { clearTimeout(slowT); S.mode = "blocked"; render(); };
+  const coll = (ref, key) => ref.onSnapshot(s => { const o = {}; s.docs.forEach(d => { if (d.exists) o[d.id] = d.data(); }); S[key] = o; stockCache = null; got(key, s.metadata); migrate(); }, dead);
+  coll(db.collection("days").orderBy("date", "desc").limit(800), "days");
+  coll(db.collection("products"), "products");
+  coll(db.collection("customers"), "customers");
+  db.doc("meta/shop").onSnapshot(s => { S.shop = s.exists ? s.data() : {}; got("shop", s.metadata); }, dead);
+}
+/* Older copies kept a stock count on each item. Turn it into a stock entry once. */
+let migrating = false, migrateFailed = false;
+async function migrate() {
+  if (migrating || migrateFailed || !S.got.days || !S.got.products) return;
+  const old = Object.keys(S.products).filter(id => typeof S.products[id].qty === "number"); if (!old.length) return;
+  migrating = true;
+  try { for (const id of old) { const p = Object.assign({}, S.products[id]), diff = Math.round(p.qty) - (stock()[id] || 0); delete p.qty; p.u = p.u || Date.now();
+      if (diff) await dayPut(today(), "adj", uid(), { t: Date.now(), p: id, d: diff, why: "carried over" });
+      await prodSet(id, p); } } catch (e) { migrateFailed = true; }
+  migrating = false;
+}
+async function start() {
+  route();
+  let c = window.claude;
+  if (location.protocol !== "file:") for (let i = 0; i < 0; i++) { await new Promise(r => setTimeout(r, 100)); c = window.claude; }
+  if (!c || typeof c.use !== "function") { db = await localDb(); S.mode = "offline"; syncStart(); }
+  else {
+    try { db = await c.use("db"); } catch (e) { db = null; }
+    if (!db) { S.mode = "blocked"; return render(); }
+    S.mode = "live";
+    c.use("user").then(u => u && u.can ? u.can("data.write") : null).then(v => { if (v === false) { S.readonly = true; render(); } }).catch(() => {});
+  }
+  listen(); render();
+}
+start();
+</script>
+</body>
+</html>
